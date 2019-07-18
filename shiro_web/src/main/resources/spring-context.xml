@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xmlns:util="http://www.springframework.org/schema/util"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context.xsd http://www.springframework.org/schema/util http://www.springframework.org/schema/util/spring-util.xsd">
+
+    <context:component-scan base-package="com.nevercome.shiroweb" />
+
+    <bean id="shiroFilter" class="org.apache.shiro.spring.web.ShiroFilterFactoryBean">
+        <property name="securityManager" ref="securityManager"/>
+        <!--登录页url-->
+        <property name="loginUrl" value="login.html"/>
+        <!--未认证跳转页面-->
+        <property name="unauthorizedUrl" value="403.html"/>
+        <!--过滤器链-->
+        <property name="filterChainDefinitions">
+            <value>
+                <!--下述配置有顺序-->
+                <!--login.html不需要任何认证-->
+                /login.html = anon
+                <!--提交接口不需要认证-->
+                /subLogin = anon
+                <!--访问该接口需要有该角色-->
+                /testRole2 = roles["admin"]
+                <!--访问该接口需要有该角色(并的关系)-->
+                <!--/testRole3 = roles["admin", "admin1"]-->
+                <!--访问该接口需要有该角色(或的关系,在自定义过滤器中实现)-->
+                /testRole3 = rolesOr["admin", "admin1"]
+                <!--访问该接口需要有该权限-->
+                /testPerms = perms["admin:update"]
+                /testPerms1 = perms["admin:update", "admin:add"]
+                <!--经过认证后访问相应路径-->
+                /* = authc
+            </value>
+        </property>
+        <!--配置filter-->
+        <property name="filters">
+            <util:map>
+                <entry key="rolesOr" value-ref="rolesOrFilter" />
+            </util:map>
+        </property>
+    </bean>
+    <!--加载自定义filter-->
+    <bean class="com.nevercome.shiroweb.filter.RolesOrFilter" id="rolesOrFilter"/>
+
+    <!--创建SecurityManager-->
+    <bean class="org.apache.shiro.web.mgt.DefaultWebSecurityManager" id="securityManager">
+        <!--注入realm-->
+        <property name="realm" ref="realm"/>
+        <!--注入sessionManager-->
+        <property name="sessionManager" ref="redisSessionManager" />
+        <!--注入cacheManager-->
+        <property name="cacheManager" ref="redisCacheManager"/>
+        <!--注入cookieRememberManager-->
+        <property name="rememberMeManager" ref="cookieRememberMeManager" />
+    </bean>
+
+    <bean class="com.nevercome.shiroweb.realm.CustomRealm" id="realm">
+        <property name="credentialsMatcher" ref="credentialsMatcher"/>
+    </bean>
+
+    <!--注入加密bean-->
+    <bean class="org.apache.shiro.authc.credential.HashedCredentialsMatcher" id="credentialsMatcher">
+        <property name="hashAlgorithmName" value="md5"/>
+        <property name="hashIterations" value="1" />
+    </bean>
+
+    <!--在自定义的SessionManager中引入自定义的sessionDAO-->
+    <bean class="com.nevercome.shiroweb.session.CustomSessionManager" id="redisSessionManager">
+        <property name="sessionDAO" ref="redisSessionDao"/>
+    </bean>
+    <bean class="com.nevercome.shiroweb.session.RedisSessionDao" id="redisSessionDao"/>
+
+    <!--增加角色/权限的缓存,自动缓存自定义realm中的认证信息(包含角色/权限),授权没必要缓存-->
+    <bean class="com.nevercome.shiroweb.cache.RedisCacheManager" id="redisCacheManager"/>
+
+    <!--加入cookie-->
+    <bean class="org.apache.shiro.web.mgt.CookieRememberMeManager" id="cookieRememberMeManager">
+        <property name="cookie" ref="cookie"/>
+    </bean>
+    <bean class="org.apache.shiro.web.servlet.SimpleCookie" id="cookie">
+        <!--cookie名称-->
+        <constructor-arg value="rememberMe" />
+        <!--cookie存活时间,单位s-->
+        <property name="maxAge" value="60000" />
+    </bean>
+</beans>
